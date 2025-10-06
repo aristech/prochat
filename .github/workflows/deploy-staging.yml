@@ -56,10 +56,9 @@ jobs:
           # Copy webapp
           cp -r webapp/channels/dist/* deploy/mattermost/client/
 
-          # Copy config templates and i18n
-          cp -r server/i18n deploy/mattermost/
-          cp -r server/templates deploy/mattermost/
-          cp server/config/default.json deploy/mattermost/config/config.json
+          # Copy i18n and templates if they exist
+          [ -d server/i18n ] && cp -r server/i18n deploy/mattermost/ || true
+          [ -d server/templates ] && cp -r server/templates deploy/mattermost/ || true
 
       - name: Create tarball
         run: |
