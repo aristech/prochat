@@ -64,6 +64,7 @@ go.work.sum
 .npminstall
 .yarninstall
 /prepackaged_plugins
+server/tmpprepackaged/
 
 # Compiled Object files, Static and Dynamic libs (Shared Objects)
 *.o

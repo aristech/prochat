@@ -37,13 +37,29 @@ jobs:
         run: |
           cd server
           make setup-go-work
-          GOOS=linux GOARCH=arm64 make package
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o mattermost ./cmd/mattermost
+          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o mmctl ./cmd/mmctl
 
       - name: Prepare deployment package
         run: |
-          mkdir -p deploy
-          cp -r server/dist/mattermost deploy/
-          cp -r webapp/channels/dist deploy/mattermost/client
+          mkdir -p deploy/mattermost/bin
+          mkdir -p deploy/mattermost/client
+          mkdir -p deploy/mattermost/config
+          mkdir -p deploy/mattermost/logs
+          mkdir -p deploy/mattermost/data
+          mkdir -p deploy/mattermost/plugins
+
+          # Copy server binaries
+          cp server/mattermost deploy/mattermost/bin/
+          cp server/mmctl deploy/mattermost/bin/
+
+          # Copy webapp
+          cp -r webapp/channels/dist/* deploy/mattermost/client/
+
+          # Copy config templates and i18n
+          cp -r server/i18n deploy/mattermost/
+          cp -r server/templates deploy/mattermost/
+          cp server/config/default.json deploy/mattermost/config/config.json
 
       - name: Create tarball
         run: |
