@@ -1,0 +1,102 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  GO_VERSION: '1.22'
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build webapp
+        run: |
+          cd webapp
+          npm ci
+          make dist
+
+      - name: Build server for ARM64
+        run: |
+          cd server
+          make setup-go-work
+          GOOS=linux GOARCH=arm64 make package
+
+      - name: Prepare deployment package
+        run: |
+          mkdir -p deploy
+          cp -r server/dist/mattermost deploy/
+          cp -r webapp/channels/dist deploy/mattermost/client
+
+      - name: Create tarball
+        run: |
+          cd deploy
+          tar -czf mattermost-staging.tar.gz mattermost
+
+      - name: Deploy to staging server
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          SSH_HOST: ${{ secrets.STAGING_HOST }}
+          SSH_USER: ${{ secrets.STAGING_USER }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+
+          # Copy to server
+          scp -i ~/.ssh/deploy_key deploy/mattermost-staging.tar.gz $SSH_USER@$SSH_HOST:/tmp/
+
+          # Deploy on server
+          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
+            set -e
+
+            # Stop the service
+            sudo systemctl stop mattermost || true
+
+            # Backup current installation
+            if [ -d /opt/mattermost ]; then
+              sudo cp -r /opt/mattermost /opt/mattermost.backup.$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Extract new version
+            sudo mkdir -p /opt/mattermost
+            sudo tar -xzf /tmp/mattermost-staging.tar.gz -C /opt/
+
+            # Set permissions
+            sudo chown -R mattermost:mattermost /opt/mattermost
+
+            # Start the service
+            sudo systemctl start mattermost
+
+            # Cleanup
+            rm /tmp/mattermost-staging.tar.gz
+          ENDSSH
+
+          # Cleanup local SSH key
+          rm ~/.ssh/deploy_key
+
+      - name: Health check
+        env:
+          STAGING_URL: https://prochat.progressnet.io
+        run: |
+          sleep 10
+          curl -f $STAGING_URL/api/v4/system/ping || exit 1
