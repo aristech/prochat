@@ -85,56 +85,52 @@ sudo chmod 600 /opt/mattermost/config/config.json
 
 ## GitHub Actions Setup
 
-### Required Secrets
+The CI/CD workflow uses a **pull-based deployment** approach:
 
-Add these secrets to your GitHub repository (Settings → Secrets and variables → Actions):
+1. GitHub Actions builds the application and creates a GitHub Release
+2. Your server pulls the latest release from GitHub using a deployment script
 
-1. **STAGING_SSH_KEY** - Private SSH key for deployment
-2. **STAGING_HOST** - Server IP or hostname (e.g., `123.45.67.89`)
-3. **STAGING_USER** - SSH username (e.g., `ubuntu` or `aris`)
-
-### Generate SSH Key for Deployment
-
-On your local machine:
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/prochat-deploy
-```
-
-Add the public key to your server:
-
-```bash
-ssh-copy-id -i ~/.ssh/prochat-deploy.pub user@prochat.progressnet.io
-```
-
-Copy the private key content and add it as `STAGING_SSH_KEY` secret in GitHub:
-
-```bash
-cat ~/.ssh/prochat-deploy
-```
+This approach avoids firewall issues with SSH from GitHub Actions runners.
 
 ## Deployment Workflow
 
-The CI/CD pipeline (`deploy-staging.yml`) will:
+### How it works:
 
-1. Build the webapp (npm build)
-2. Build the Go server for ARM64
-3. Package everything into a tarball
-4. Deploy to the server via SSH
-5. Restart the mattermost service
-6. Perform a health check
+1. **GitHub Actions** (automatic on push to `master`):
+   - Builds the webapp
+   - Builds the Go server for ARM64
+   - Creates a GitHub Release with the build artifact
 
-### Manual Deployment Trigger
+2. **On your server** (manual or automated):
+   - Run the deployment script to pull and deploy the latest release
 
-You can manually trigger deployment from GitHub Actions:
+### Deploy on Server
 
-1. Go to Actions tab
-2. Select "Deploy to Staging"
-3. Click "Run workflow"
+Copy the deployment script to your server:
 
-### Automatic Deployment
+```bash
+# On your server
+curl -o deploy.sh https://raw.githubusercontent.com/YOUR_USERNAME/prochat/master/deployment/deploy-from-github.sh
+chmod +x deploy.sh
+```
 
-Pushes to `master` branch will automatically trigger deployment.
+Update `GITHUB_REPO` variable in the script with your repository.
+
+Run deployment:
+
+```bash
+sudo ./deploy.sh
+```
+
+### Automated Deployment (Optional)
+
+To automatically deploy when a new release is created, set up a cron job or use GitHub webhooks.
+
+Example cron (check every 5 minutes):
+
+```bash
+*/5 * * * * /home/your-user/deploy.sh >> /var/log/prochat-deploy.log 2>&1
+```
 
 ## Server Management Commands
 

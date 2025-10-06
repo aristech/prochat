@@ -65,53 +65,23 @@ jobs:
           cd deploy
           tar -czf mattermost-staging.tar.gz mattermost
 
-      - name: Deploy to staging server
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.STAGING_SSH_KEY }}
-          SSH_HOST: ${{ secrets.STAGING_HOST }}
-          SSH_USER: ${{ secrets.STAGING_USER }}
-        run: |
-          # Setup SSH
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H $SSH_HOST >> ~/.ssh/known_hosts
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: staging-${{ github.run_number }}
+          release_name: Staging Build ${{ github.run_number }}
+          draft: false
+          prerelease: true
 
-          # Copy to server
-          scp -i ~/.ssh/deploy_key deploy/mattermost-staging.tar.gz $SSH_USER@$SSH_HOST:/tmp/
-
-          # Deploy on server
-          ssh -i ~/.ssh/deploy_key $SSH_USER@$SSH_HOST << 'ENDSSH'
-            set -e
-
-            # Stop the service
-            sudo systemctl stop mattermost || true
-
-            # Backup current installation
-            if [ -d /opt/mattermost ]; then
-              sudo cp -r /opt/mattermost /opt/mattermost.backup.$(date +%Y%m%d-%H%M%S)
-            fi
-
-            # Extract new version
-            sudo mkdir -p /opt/mattermost
-            sudo tar -xzf /tmp/mattermost-staging.tar.gz -C /opt/
-
-            # Set permissions
-            sudo chown -R mattermost:mattermost /opt/mattermost
-
-            # Start the service
-            sudo systemctl start mattermost
-
-            # Cleanup
-            rm /tmp/mattermost-staging.tar.gz
-          ENDSSH
-
-          # Cleanup local SSH key
-          rm ~/.ssh/deploy_key
-
-      - name: Health check
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
         env:
-          STAGING_URL: https://prochat.progressnet.io
-        run: |
-          sleep 10
-          curl -f $STAGING_URL/api/v4/system/ping || exit 1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./deploy/mattermost-staging.tar.gz
+          asset_name: mattermost-staging.tar.gz
+          asset_content_type: application/gzip
