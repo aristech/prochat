@@ -44,7 +44,6 @@ jobs:
       - name: Build server for ARM64
         env:
           BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
-          BUILD_ENTERPRISE: 'true'
         run: |
           cd server
 
@@ -53,17 +52,10 @@ jobs:
           BUILD_HASH=$(git rev-parse HEAD)
           BUILD_HASH_ENTERPRISE="none"
 
-          # Check if enterprise directory exists
-          if [ -d "enterprise" ]; then
-            BUILD_ENTERPRISE_READY="true"
-            BUILD_TYPE_NAME="enterprise"
-            BUILD_HASH_ENTERPRISE=$(cd enterprise && git rev-parse HEAD 2>/dev/null || echo "none")
-            BUILD_TAGS="enterprise sourceavailable"
-          else
-            BUILD_ENTERPRISE_READY="false"
-            BUILD_TYPE_NAME="team"
-            BUILD_TAGS="sourceavailable"
-          fi
+          # Force Team Edition build (enterprise code not available)
+          BUILD_ENTERPRISE_READY="false"
+          BUILD_TYPE_NAME="team"
+          BUILD_TAGS="sourceavailable"
 
           # Build LDFLAGS
           LDFLAGS="-X 'github.com/mattermost/mattermost/server/public/model.BuildNumber=$BUILD_NUMBER'"
@@ -83,15 +75,9 @@ jobs:
 
           echo "Building mmctl for ARM64..."
           MMCTL_LDFLAGS="-X 'github.com/mattermost/mattermost/server/v8/cmd/mmctl/commands.buildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ')'"
-          if [ "$BUILD_ENTERPRISE_READY" = "true" ]; then
-            MMCTL_BUILD_TAGS="enterprise"
-          else
-            MMCTL_BUILD_TAGS=""
-          fi
 
           env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
             -trimpath \
-            -tags "$MMCTL_BUILD_TAGS" \
             -ldflags "$MMCTL_LDFLAGS" \
             -o mmctl \
             ./cmd/mmctl
@@ -138,12 +124,8 @@ jobs:
           sed -i 's|"SMTPPort": "2500"|"SMTPPort": ""|g' ../deploy/mattermost/config/config.json
           chmod 600 ../deploy/mattermost/config/config.json
 
-          # Copy license and readme files
-          if [ -f "enterprise/ENTERPRISE-EDITION-LICENSE.txt" ]; then
-            cp enterprise/ENTERPRISE-EDITION-LICENSE.txt ../deploy/mattermost/
-          else
-            cp build/MIT-COMPILED-LICENSE.md ../deploy/mattermost/
-          fi
+          # Copy license file (Team Edition)
+          cp build/MIT-COMPILED-LICENSE.md ../deploy/mattermost/LICENSE
           cp ../NOTICE.txt ../deploy/mattermost/
           cp ../README.md ../deploy/mattermost/
 
