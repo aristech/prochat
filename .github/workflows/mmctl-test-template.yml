@@ -21,13 +21,16 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
 
 jobs:
   test:
     name: ${{ inputs.name }}
     runs-on: ubuntu-22.04
-    # Skip FIPS tests if Docker Hub credentials aren't available (e.g., in forks)
-    if: ${{ !inputs.fips-enabled || (secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != '') }}
     env:
       COMPOSE_PROJECT_NAME: ghactions
     steps:
