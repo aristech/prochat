@@ -9,6 +9,7 @@ on:
 env:
   GO_VERSION: '1.22'
   NODE_VERSION: '20'
+  BUILD_NUMBER: ${{ github.run_number }}
 
 jobs:
   build-and-deploy:
@@ -16,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -33,55 +36,178 @@ jobs:
           npm ci
           make dist
 
-      - name: Build server for ARM64
+      - name: Prepare build environment
         run: |
           cd server
           make setup-go-work
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o mattermost ./cmd/mattermost
-          GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -o mmctl ./cmd/mmctl
+
+      - name: Build server for ARM64
+        env:
+          BUILD_NUMBER: ${{ env.BUILD_NUMBER }}
+          BUILD_ENTERPRISE: 'true'
+        run: |
+          cd server
+
+          # Set build metadata
+          BUILD_DATE=$(date -u)
+          BUILD_HASH=$(git rev-parse HEAD)
+          BUILD_HASH_ENTERPRISE="none"
+
+          # Check if enterprise directory exists
+          if [ -d "enterprise" ]; then
+            BUILD_ENTERPRISE_READY="true"
+            BUILD_TYPE_NAME="enterprise"
+            BUILD_HASH_ENTERPRISE=$(cd enterprise && git rev-parse HEAD 2>/dev/null || echo "none")
+            BUILD_TAGS="enterprise sourceavailable"
+          else
+            BUILD_ENTERPRISE_READY="false"
+            BUILD_TYPE_NAME="team"
+            BUILD_TAGS="sourceavailable"
+          fi
+
+          # Build LDFLAGS
+          LDFLAGS="-X 'github.com/mattermost/mattermost/server/public/model.BuildNumber=$BUILD_NUMBER'"
+          LDFLAGS="$LDFLAGS -X 'github.com/mattermost/mattermost/server/public/model.BuildDate=$BUILD_DATE'"
+          LDFLAGS="$LDFLAGS -X 'github.com/mattermost/mattermost/server/public/model.BuildHash=$BUILD_HASH'"
+          LDFLAGS="$LDFLAGS -X 'github.com/mattermost/mattermost/server/public/model.BuildHashEnterprise=$BUILD_HASH_ENTERPRISE'"
+          LDFLAGS="$LDFLAGS -X 'github.com/mattermost/mattermost/server/public/model.BuildEnterpriseReady=$BUILD_ENTERPRISE_READY'"
+
+          # Build binaries for ARM64
+          echo "Building Mattermost server for ARM64..."
+          env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+            -trimpath \
+            -tags "$BUILD_TAGS production" \
+            -ldflags "$LDFLAGS" \
+            -o mattermost \
+            ./cmd/mattermost
+
+          echo "Building mmctl for ARM64..."
+          MMCTL_LDFLAGS="-X 'github.com/mattermost/mattermost/server/v8/cmd/mmctl/commands.buildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ')'"
+          if [ "$BUILD_ENTERPRISE_READY" = "true" ]; then
+            MMCTL_BUILD_TAGS="enterprise"
+          else
+            MMCTL_BUILD_TAGS=""
+          fi
+
+          env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build \
+            -trimpath \
+            -tags "$MMCTL_BUILD_TAGS" \
+            -ldflags "$MMCTL_LDFLAGS" \
+            -o mmctl \
+            ./cmd/mmctl
 
       - name: Prepare deployment package
         run: |
-          mkdir -p deploy/mattermost/bin
-          mkdir -p deploy/mattermost/client
-          mkdir -p deploy/mattermost/config
-          mkdir -p deploy/mattermost/logs
-          mkdir -p deploy/mattermost/data
-          mkdir -p deploy/mattermost/plugins
+          cd server
 
-          # Copy server binaries
-          cp server/mattermost deploy/mattermost/bin/
-          cp server/mmctl deploy/mattermost/bin/
+          # Create directory structure
+          mkdir -p ../deploy/mattermost/bin
+          mkdir -p ../deploy/mattermost/client
+          mkdir -p ../deploy/mattermost/config
+          mkdir -p ../deploy/mattermost/logs
+
+          # Copy binaries
+          cp mattermost ../deploy/mattermost/bin/
+          cp mmctl ../deploy/mattermost/bin/
+          chmod +x ../deploy/mattermost/bin/mattermost
+          chmod +x ../deploy/mattermost/bin/mmctl
 
           # Copy webapp
-          cp -r webapp/channels/dist/* deploy/mattermost/client/
+          cp -r ../webapp/channels/dist/* ../deploy/mattermost/client/
 
-          # Copy i18n and templates if they exist
-          [ -d server/i18n ] && cp -r server/i18n deploy/mattermost/ || true
-          [ -d server/templates ] && cp -r server/templates deploy/mattermost/ || true
+          # Copy required directories
+          cp -r i18n ../deploy/mattermost/
+          cp -r templates ../deploy/mattermost/
+          cp -r fonts ../deploy/mattermost/
+
+          # Remove MJML source files and partials from templates
+          rm -f ../deploy/mattermost/templates/*.mjml
+          rm -rf ../deploy/mattermost/templates/partials/
+
+          # Generate default config
+          cp config/README.md ../deploy/mattermost/config/
+          OUTPUT_CONFIG=$(pwd)/../deploy/mattermost/config/config.json go run -tags production ./scripts/config_generator
+
+          # Set production defaults in config
+          sed -i 's|"ConsoleLevel": "DEBUG"|"ConsoleLevel": "INFO"|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"SiteURL": "http://localhost:8065"|"SiteURL": ""|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"SendEmailNotifications": true|"SendEmailNotifications": false|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"FeedbackEmail": "test@example.com"|"FeedbackEmail": ""|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"ReplyToAddress": "test@example.com"|"ReplyToAddress": ""|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"SMTPServer": "localhost"|"SMTPServer": ""|g' ../deploy/mattermost/config/config.json
+          sed -i 's|"SMTPPort": "2500"|"SMTPPort": ""|g' ../deploy/mattermost/config/config.json
+          chmod 600 ../deploy/mattermost/config/config.json
+
+          # Copy license and readme files
+          if [ -f "enterprise/ENTERPRISE-EDITION-LICENSE.txt" ]; then
+            cp enterprise/ENTERPRISE-EDITION-LICENSE.txt ../deploy/mattermost/
+          else
+            cp build/MIT-COMPILED-LICENSE.md ../deploy/mattermost/
+          fi
+          cp ../NOTICE.txt ../deploy/mattermost/
+          cp ../README.md ../deploy/mattermost/
+
+          # Create manifest file
+          cat > ../deploy/mattermost/manifest.txt << EOF
+          Build Number: ${{ env.BUILD_NUMBER }}
+          Build Date: $(date -u)
+          Git Commit: $(git rev-parse HEAD)
+          Git Branch: $(git rev-parse --abbrev-ref HEAD)
+          EOF
 
       - name: Create tarball
         run: |
           cd deploy
-          tar -czf mattermost-staging.tar.gz mattermost
+          tar -czf mattermost-staging-arm64.tar.gz mattermost
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+          # Generate checksums
+          sha256sum mattermost-staging-arm64.tar.gz > mattermost-staging-arm64.tar.gz.sha256
+
+      - name: Create Release and Upload Assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: staging-${{ github.run_number }}
-          release_name: Staging Build ${{ github.run_number }}
-          draft: false
-          prerelease: true
+        run: |
+          TAG_NAME="staging-${{ github.run_number }}"
+          RELEASE_NAME="Staging Build ${{ github.run_number }}"
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./deploy/mattermost-staging.tar.gz
-          asset_name: mattermost-staging.tar.gz
-          asset_content_type: application/gzip
+          # Generate release notes
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+
+          cat > release-notes.md << EOF
+          ## Staging Build ${{ github.run_number }}
+
+          **Platform:** Ubuntu ARM64
+          **Built:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          **Commit:** [$COMMIT_HASH](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+          **Author:** $COMMIT_AUTHOR
+
+          ### Changes
+          $COMMIT_MSG
+
+          ### Installation
+          Download \`mattermost-staging-arm64.tar.gz\` and deploy using:
+          \`\`\`bash
+          ./deployment/deploy-from-github.sh
+          \`\`\`
+
+          ### Checksums
+          \`\`\`
+          $(cat deploy/mattermost-staging-arm64.tar.gz.sha256)
+          \`\`\`
+          EOF
+
+          # Create release
+          gh release create "$TAG_NAME" \
+            --title "$RELEASE_NAME" \
+            --notes-file release-notes.md \
+            --prerelease \
+            deploy/mattermost-staging-arm64.tar.gz \
+            deploy/mattermost-staging-arm64.tar.gz.sha256
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf deploy
+          rm -f release-notes.md
