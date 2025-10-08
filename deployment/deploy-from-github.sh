@@ -34,8 +34,12 @@ log_error() {
 # Fetch latest staging release
 log_info "Fetching latest staging release from GitHub..."
 LATEST_RELEASE=$(curl -s "https://api.github.com/repos/$GITHUB_REPO/releases" | \
-  grep -m 1 '"tag_name":.*staging-' | \
-  cut -d '"' -f 4)
+  grep '"tag_name":.*staging-' | \
+  cut -d '"' -f 4 | \
+  sed 's/staging-//' | \
+  sort -rn | \
+  head -n 1 | \
+  sed 's/^/staging-/')
 
 if [ -z "$LATEST_RELEASE" ]; then
   log_error "No staging release found"

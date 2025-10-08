@@ -3644,7 +3644,7 @@
     },
     {
         "id": "api.templates.invite_body_footer.info",
-        "translation": "ProgressNet is a secure team collaboration platform built on Mattermost, customized for our organization."
+        "translation": "ProChat is a secure team collaboration platform, customized for our organization."
     },
     {
         "id": "api.templates.invite_body_footer.learn_more",
@@ -3652,7 +3652,7 @@
     },
     {
         "id": "api.templates.invite_body_footer.title",
-        "translation": "What is ProgressNet?"
+        "translation": "What is ProChat?"
     },
     {
         "id": "api.templates.invite_body_guest.subTitle",
