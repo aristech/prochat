@@ -137,8 +137,8 @@ const DesktopAuthToken: React.FC<Props> = ({href, onLogin}: Props) => {
         );
         subMessage = (
             <FormattedMessage
-                id='desktop_auth_token.complete.openMattermost'
-                defaultMessage='Click on <b>Open Mattermost</b> in the browser prompt to <a>launch the desktop app</a>'
+                id='desktop_auth_token.complete.openProChat'
+                defaultMessage='Click on <b>Open ProChat</b> in the browser prompt to <a>launch the desktop app</a>'
                 values={{
                     a: (chunks: React.ReactNode) => {
                         return (

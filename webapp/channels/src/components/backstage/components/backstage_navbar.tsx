@@ -27,7 +27,7 @@ const BackstageNavbar = ({team, siteName}: Props) => {
                 <span>
                     {teamExists ? (
                         <FormattedMessage
-                            id='backstage_navbar.backToMattermost'
+                            id='backstage_navbar.backToProChat'
                             defaultMessage='Back to {siteName}'
                             values={{siteName: siteName ?? team?.name}}
                         />

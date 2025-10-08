@@ -13,7 +13,7 @@ export default function MattermostLogo(props: React.HTMLAttributes<HTMLSpanEleme
                 viewBox='0 0 112 112'
                 xmlns='http://www.w3.org/2000/svg'
                 role='img'
-                aria-label={formatMessage({id: 'generic_icons.mattermost', defaultMessage: 'ProChat Logo'})}
+                aria-label={formatMessage({id: 'generic_icons.prochat', defaultMessage: 'ProChat Logo'})}
             >
                 <g
                     transform='translate(-34.843 -50)'

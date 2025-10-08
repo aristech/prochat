@@ -56,7 +56,8 @@ jobs:
           # Copy webapp
           cp -r webapp/channels/dist/* deploy/mattermost/client/
 
-          # Copy i18n and templates if they exist
+          # Copy fonts, i18n and templates if they exist
+          [ -d server/fonts ] && cp -r server/fonts deploy/mattermost/ || true
           [ -d server/i18n ] && cp -r server/i18n deploy/mattermost/ || true
           [ -d server/templates ] && cp -r server/templates deploy/mattermost/ || true
 

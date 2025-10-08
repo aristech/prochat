@@ -1987,7 +1987,7 @@
   },
   {
     "id": "api.email_batching.send_batched_email_notification.button",
-    "translation": "Open Mattermost"
+    "translation": "Open ProChat"
   },
   {
     "id": "api.email_batching.send_batched_email_notification.messageButton",
@@ -3496,11 +3496,11 @@
   },
   {
     "id": "api.templates.cloud_welcome_email.button",
-    "translation": "Open Mattermost"
+    "translation": "Open ProChat"
   },
   {
     "id": "api.templates.cloud_welcome_email.download_mm_info",
-    "translation": "Download the Mattermost App"
+    "translation": "Download the ProChat App"
   },
   {
     "id": "api.templates.cloud_welcome_email.info",
@@ -3600,7 +3600,7 @@
   },
   {
     "id": "api.templates.email_footer_v2",
-    "translation": "© 2022 Mattermost, Inc. 530 Lytton Avenue, Second floor, Palo Alto, CA, 94301"
+    "translation": "Sent by ProgressNet © 2025 Pafsaniou 2, Ag. Dimitrios 173 43, Greece"
   },
   {
     "id": "api.templates.email_info1",
@@ -3644,7 +3644,7 @@
   },
   {
     "id": "api.templates.invite_body_footer.info",
-    "translation": "Mattermost is a flexible, open source messaging platform that enables secure team collaboration."
+    "translation": "ProgressNet is a secure team collaboration platform built on Mattermost, customized for our organization."
   },
   {
     "id": "api.templates.invite_body_footer.learn_more",
@@ -3652,7 +3652,7 @@
   },
   {
     "id": "api.templates.invite_body_footer.title",
-    "translation": "What is Mattermost?"
+    "translation": "What is ProgressNet?"
   },
   {
     "id": "api.templates.invite_body_guest.subTitle",
@@ -3764,7 +3764,7 @@
   },
   {
     "id": "api.templates.post_body.button",
-    "translation": "Reply in Mattermost"
+    "translation": "Reply in ProChat"
   },
   {
     "id": "api.templates.questions_footer.info",
@@ -6408,7 +6408,7 @@
   },
   {
     "id": "app.notification.footer.infoLogin",
-    "translation": "Login to Mattermost"
+    "translation": "Login to ProChat"
   },
   {
     "id": "app.notification.footer.title",
